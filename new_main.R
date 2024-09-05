@@ -1,6 +1,7 @@
 library(readxl)
 library(dplyr)
 library(rstudioapi)
+library(jsonlite)
 
 if (requireNamespace("rstudioapi", quietly = TRUE)) {
   # Print a message indicating the script is running in RStudio
@@ -49,6 +50,46 @@ for (file in excel_files) {
   data_list[[var_name]] <- read_excel(file)
 }
 
+#Load corresponding geo-eng lineitems
+
+##Load JSON file as list
+corresponding_lineitems_json <- fromJSON("lineitem_data/corresponding_lineitems.json")
+
+##Convert JSON list to dataframe making sure both English and Georgian names are put in columns (and not in column names)
+
+lookup_table <- data.frame(English = names(corresponding_lineitems_json), 
+                 Georgian = unlist(corresponding_lineitems_json))
+
+###Reset row names to null
+rownames(lookup_table) <- NULL
+
+#Make dataframes uniform
+
+make_identical <- function(df, lookup_table) {
+  
+  # Rename columns
+  df <- df %>%
+    rename(
+      LineItemGEO = any_of("LineItem"),
+      CategoryMain = any_of("Category")
+    )
+  
+  # Check if 'LineItemENG' already exists, and only add it if it doesn't
+  if (!"LineItemENG" %in% colnames(df)) {
+    df <- df %>%
+      left_join(lookup_table, by = c("LineItemGEO" = "Georgian")) %>%
+      rename(LineItemENG = English)
+  }
+  
+  return(df)
+}
+
+
+
+uniform_data_list <- lapply(data_list, make_identical, lookup_table = lookup_table)
+
+
+
 # Filtering criteria
 
 ## Columns to keep
@@ -67,8 +108,6 @@ variables_financial_non_financial <- list('Cash and cash equivalents', 'Current 
                                           'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
                                           'Share capital (in case of Limited Liability Company - "capital", in case of cooperative entity - "unit capital"'
 )
-
-
 
 variables_financial_other <- list('Cash and cash equivalents', 'Inventories', 'Trade receivables',
                                   'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
@@ -106,6 +145,8 @@ check_and_process_dfs <- function(dfs, columns_to_keep, variables_financial_non_
     df <- df %>%
       select(all_of(columns_to_keep)) %>%
       filter(CategoryMain != "III ჯგუფი") %>%
+      filter(FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)") %>%
+      filter(LineITemGEO != "მარაგების გაუფასურების (ხარჯი) / აღდგენა")
       mutate(Value = if ("Value" %in% colnames(df)) as.numeric(Value) else Value) %>%
       mutate(
         FormName = case_when(
@@ -125,7 +166,6 @@ check_and_process_dfs <- function(dfs, columns_to_keep, variables_financial_non_
           TRUE ~ Value
         )
       ) %>%
-      filter(FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)") %>%
       filter(!(FormName == "non-financial institutions" & !LineItemENG %in% variables_financial_non_financial)) %>%
       filter(!(FormName == "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_non_financial)) %>%
       filter(!(FormName != "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_other)) %>%
@@ -167,3 +207,10 @@ check_and_process_dfs <- function(dfs, columns_to_keep, variables_financial_non_
   
   return(dfs)
 }
+
+primary_processed_list <- lapply(uniform_data_list, check_and_process_dfs, columns_to_keep = columns_to_keep,
+                                 variables_financial_non_financial = variables_financial_non_financial,
+                                 variables_financial_other = variables_financial_other,
+                                 variables_profit_loss = variables_profit_loss,
+                                 variables_cash_flow)
+
