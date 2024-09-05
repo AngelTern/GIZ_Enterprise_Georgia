@@ -1,0 +1,179 @@
+{
+    "Cash and cash equivalents": [
+        "ფულადი სახსრები და მათი ეკვივალენტები"
+    ],
+    "Trade receivables": [
+        "სავაჭრო და სხვა მოთხოვნები"
+    ],
+    "Inventories": [
+        "მარაგები"
+    ],
+    "Investment property": [
+        "საინვესტიციო ქონება"
+    ],
+    "Other current assets": [
+        "სხვა მოკლევადიანი აქტივები"
+    ],
+    "Biological assets": [
+        "ბიოლოგიური აქტივები"
+    ],
+    "Goodwill": [
+        "გუდვილი"
+    ],
+    "Other intangible assets": [
+        "სხვა არამატერიალური აქტივები"
+    ],
+    "Property, plant and equipment": [
+        "ძირითადი საშუალებები"
+    ],
+    "Investments in subsidiaries": [
+        "ინვესტიციები შვილობილ კომპანიებში"
+    ],
+    "Other non current assets": [
+        "სხვა გრძელვადიანი აქტივები"
+    ],
+    "Total assets": [
+        "სულ აქტივები"
+    ],
+    "Finance lease payable": [
+        "საიჯარო ვალდებულება"
+    ],
+    "Trade payables": [
+        "სავაჭრო ვალდებულებები"
+    ],
+    "Provisions for liabilities and charges": [
+        "ანარიცხები"
+    ],
+    "Unearned income": [
+        "გამოუმუშავებელი შემოსავალი"
+    ],
+    "Current borrowings": [
+        "მოკლევადიანი ნასესხები სახსრები"
+    ],
+    "Non current borrowings": [
+        "გრძელვადიანი ნასესხები სახსრები"
+    ],
+    "Received grants": [
+        "მიღებული გრანტები"
+    ],
+    "Total liabilities": [
+        "სულ ვალდებულებები"
+    ],
+    "Share capital": [
+        "სააქციო კაპიტალი (შპს-ს შემთხვევაში 'კაპიტალი', კოოპერატივის შემთხვევაში 'საპაიო კაპიტალი')"
+    ],
+    "Share premium": [
+        "საემისიო შემოსავალი"
+    ],
+    "Treasury shares": [
+        "გამოსყიდული საკუთარი აქციები"
+    ],
+    "Retained earnings / (Accumulated deficit)": [
+        "გაუნაწილებელი მოგება / (დაგროვილი ზარალი)"
+    ],
+    "Other reserves": [
+        "საკუთარი კაპიტალის სხვა კომპონენტები"
+    ],
+    "Total equity": [
+        "სულ საკუთარი კაპიტალი"
+    ],
+    "Total liabilities and equity": [
+        "სულ საკუთარი კაპიტალი და ვალდებულებები"
+    ],
+    "Total current assets": [
+        "სულ მოკლევადიანი აქტივები"
+    ],
+    "Total current liabilities": [
+        "სულ მოკლევადიანი ვალდებულებები"
+    ],
+    "Net Revenue": [
+        "ნეტო ამონაგები"
+    ],
+    "Cost of goods sold": [
+        "გაყიდვების თვითღირებულება"
+    ],
+    "Gross profit": [
+        "საერთო მოგება"
+    ],
+    "Depreciation and amortisation": [
+        "ცვეთა / ამორტიზაციის ხარჯი"
+    ],
+    "Rental expenses": [
+        "იჯარის ხარჯი"
+    ],
+    "Other administrative and operating expenses": [
+        "ადმინისტრაციული და სხვა საოპერაციო ხარჯი"
+    ],
+    "Operating income": [
+        "საოპერაციო მოგება"
+    ],
+    "Net gain (loss) from foreign exchange operations": [
+        "წმინდა შემოსულობა / (დანაკარგი) უცხოური ვალუტით ვაჭრობიდან და სავალუტო სახსრების გადაფასებიდან"
+    ],
+    "Dividends received": [
+        "მიღებული დივიდენდები"
+    ],
+    "Other net operating income/(expense)": [
+        "სხვა არასაოპერაციო შემოსავალი / (ხარჯი)"
+    ],
+    "Profit/(loss) before tax from continuing operations": [
+        "მოგება / (ზარალი) მოგების გადასახადის ხარჯამდე განგრძობითი ოპერაციებიდან"
+    ],
+    "Income tax": [
+        "მოგების გადასახადის ხარჯი"
+    ],
+    "Profit/(loss)": [
+        "საანგარიშგებო პერიოდის მოგება / ზარალი"
+    ],
+    "Revaluation reserve of property, plant and equipment": [
+        "ძირითადი საშუალებების (მათ შორის, ბიოლოგიური აქტივების) გადაფასების რეზერვი"
+    ],
+    "Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)": [
+        "სხვა (მათ შორის წილი ერთობლივი და მეკავშირე საწარმოების უძრავი ქონების გადაფასების რეზერვი და დადგენილ გადასახდელიანი პროგრამები)"
+    ],
+    "Total other comprehensive (loss) income": [
+        "სხვა სრული შემოსავალი / (ზარალი), სულ:"
+    ],
+    "Total comprehensive income / (loss)": [
+        "მთლიანი სრული შემოსავალი / (ზარალი)"
+    ],
+    "Net cash from operating activities": [
+        "საოპერაციო საქმიანობიდან წარმოქმნილი (საოპერაციო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები"
+    ],
+    "Net cash used in investing activities": [
+        "საინვესტიციო საქმიანობიდან წარმოქმნილი (საინვესტიციო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები"
+    ],
+    "Net cash raised in financing activities": [
+        "საფინანსო საქმიანობიდან წარმოქმნილი (საფინანსო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები"
+    ],
+    "Net cash inflow for the year": [
+        "ფულადი სახსრების შემოსვლა (გასვლა)"
+    ],
+    "Effect of exchange rate changes on cash and cash equivalents": [
+        "ვალუტის  კურსის ცვლილების გავლენა ფულად სახსრებსა და მათ ეკვივალენტებზე"
+    ],
+    "Cash at the beginning of the year": [
+        "ფულადი სახსრები და მათი ეკვივალენტები საანგარიშგებო პერიოდის დასაწყისში"
+    ],
+    "Cash at the end of the year": [
+        "ფულადი სახსრები და მათი ეკვივალენტები საანგარიშგებო პერიოდის ბოლოს"
+    ],
+    "Other operating income": [
+        "სხვა საოპერაციო შემოსავალი"
+    ],
+    "Personnel expense": [
+        "დაქირავებულ პირთა გასამრჯელოების ხარჯი"
+    ],
+    "Impairment (loss)/reversal of financial assets": [
+        "ფინანსური აქტივების გაუფასურების (ხარჯი) / აღდგენა"
+    ],
+    "Cash advances made to other parties": [
+        "სხვა მხარეებზე ავანსებად გაცემული ფულადი სახსრები"
+    ],
+    "Current Inventory": [
+        "მოკლევადიანი მარაგები"
+    ],
+    "Non current inventory": [
+        "გრძელვადიანი მარაგები"
+    ]
+}
