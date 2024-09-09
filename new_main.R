@@ -100,6 +100,7 @@ correct_lineitems <- function(df) {
         LineItemENG == "Impairment loss/reversal of  financial assets" ~ "Impairment (loss)/reversal of financial assets",
         LineItemENG == "Total comprehensive income" ~ "Total comprehensive income / (loss)",
         LineItemENG == "Total comprehensive income(loss)" ~ "Total comprehensive income / (loss)",
+        LineItemENG == "Prepayments" ~ "Cash advances made to other parties",
         LineItemENG == "Cash advances to other parties" ~ "Cash advances made to other parties",
         LineItemENG == 'Share capital (in case of Limited Liability Company - "capital", in case of cooperative entity - "unit capital"' ~ "Share capital",
         LineItemENG == "    - inventories" ~ "Inventories",
@@ -117,7 +118,6 @@ correct_lineitems <- function(df) {
 
 
 #Get variables for lookup table
-
 for (i in seq_along(data_list)) {
   
   # Check if 'LineItemENG' exists in the current dataframe
@@ -136,28 +136,86 @@ for (i in seq_along(data_list)) {
     # Step 3: Filter for financial_non_financial and print result
     df_filtered_financial_non_financial <- df_corrected %>%
       filter(FormName == "არაფინანსური ინსტიტუტებისთვის" & SheetName == "ფინანსური მდგომარეობა")
-    print(paste("All found in financial_non_financial:", 
-                all(variables_financial_non_financial %in% df_filtered_financial_non_financial$LineItemENG)))
+    
+    if (all(variables_financial_non_financial %in% df_filtered_financial_non_financial$LineItemENG) == TRUE) {
+      print(paste("All found in financial_non_financial:", TRUE))
+    } else {
+      print(paste("Variables not found in financial_non_financial:", 
+                  setdiff(variables_financial_non_financial, df_filtered_financial_non_financial$LineItemENG)))
+    }
     
     # Step 4: Filter for financial_other and print result
     df_filtered_financial_other <- df_corrected %>%
       filter(FormName != "არაფინანსური ინსტიტუტებისთვის" & SheetName == "ფინანსური მდგომარეობა")
-    print(paste("All found in financial_other:", 
-                all(variables_financial_other %in% df_filtered_financial_other$LineItemENG)))
+    
+    if (all(variables_financial_other %in% df_filtered_financial_other$LineItemENG) == TRUE) {
+      print(paste("All found in financial_other:", TRUE))
+    } else {
+      print(paste("Variables not found in financial_other:", 
+                  setdiff(variables_financial_other, df_filtered_financial_other$LineItemENG)))
+    }
     
     # Step 5: Filter for profit_loss and print result
     df_filtered_profit_loss <- df_corrected %>%
       filter(SheetName == "საქმიანობის შედეგები")
-    print(paste("All found in profit_loss:", 
-                all(variables_profit_loss %in% df_filtered_profit_loss$LineItemENG)))
+    
+    if (all(variables_profit_loss %in% df_filtered_profit_loss$LineItemENG) == TRUE) {
+      print(paste("All found in profit_loss:", TRUE))
+    } else {
+      print(paste("Variables not found in profit_loss:", 
+                  setdiff(variables_profit_loss, df_filtered_profit_loss$LineItemENG)))
+    }
     
     # Step 6: Filter for cash_flow and print result
     df_filtered_cash_flow <- df_corrected %>%
       filter(SheetName == "ფულადი სახსრების მოძრაობა")
-    print(paste("All found in cash_flow:", 
-                all(variables_cash_flow %in% df_filtered_cash_flow$LineItemENG)))
+    
+    if (all(variables_cash_flow %in% df_filtered_cash_flow$LineItemENG) == TRUE) {
+      print(paste("All found in cash_flow:", TRUE))
+    } else {
+      print(paste("Variables not found in cash_flow:", 
+                  setdiff(variables_cash_flow, df_filtered_cash_flow$LineItemENG)))
+    }
   }
 }
+
+
+all_variables <- c(
+  'Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
+  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
+  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
+  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
+  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
+  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
+  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
+  'Share capital', 'Net Revenue', 'Cost of goods sold', 'Gross profit', 'Other operating income',
+  'Personnel expense', 'Rental expenses', 'Depreciation and amortisation',
+  'Other administrative and operating expenses', 'Operating income', 
+  'Impairment (loss)/reversal of financial assets', 'Inventories',
+  'Net gain (loss) from foreign exchange operations', 'Dividends received',
+  'Other net operating income/(expense)', 'Profit/(loss) before tax from continuing operations',
+  'Income tax', 'Profit/(loss)', 'Revaluation reserve of property, plant and equipment',
+  'Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)',
+  'Total other comprehensive (loss) income', 'Total comprehensive income / (loss)', 'Net cash from operating activities', 'Net cash used in investing activities',
+  'Net cash raised in financing activities', 'Net cash inflow for the year',
+  'Effect of exchange rate changes on cash and cash equivalents',
+  'Cash at the beginning of the year', 'Cash at the end of the year'
+)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
