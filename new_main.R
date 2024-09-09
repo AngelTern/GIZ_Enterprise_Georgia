@@ -66,7 +66,7 @@ variables_financial_non_financial <- list('Cash and cash equivalents', 'Current 
                                           'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
                                           'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
                                           'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
-                                          'Share capital"'
+                                          'Share capital'
 )
 
 variables_financial_other <- list('Cash and cash equivalents', 'Inventories', 'Trade receivables',
@@ -103,7 +103,7 @@ correct_lineitems <- function(df) {
         LineItemENG == "Prepayments" ~ "Cash advances made to other parties",
         LineItemENG == "Cash advances to other parties" ~ "Cash advances made to other parties",
         LineItemENG == 'Share capital (in case of Limited Liability Company - "capital", in case of cooperative entity - "unit capital"' ~ "Share capital",
-        LineItemENG == "    - inventories" ~ "Inventories",
+        LineItemENG == "- inventories" ~ "Inventories",
         TRUE ~ LineItemENG
       ),
       LineItemGEO = case_when(
@@ -178,46 +178,6 @@ for (i in seq_along(data_list)) {
     }
   }
 }
-
-
-all_variables <- c(
-  'Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
-  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
-  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
-  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
-  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
-  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
-  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
-  'Share capital', 'Net Revenue', 'Cost of goods sold', 'Gross profit', 'Other operating income',
-  'Personnel expense', 'Rental expenses', 'Depreciation and amortisation',
-  'Other administrative and operating expenses', 'Operating income', 
-  'Impairment (loss)/reversal of financial assets', 'Inventories',
-  'Net gain (loss) from foreign exchange operations', 'Dividends received',
-  'Other net operating income/(expense)', 'Profit/(loss) before tax from continuing operations',
-  'Income tax', 'Profit/(loss)', 'Revaluation reserve of property, plant and equipment',
-  'Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)',
-  'Total other comprehensive (loss) income', 'Total comprehensive income / (loss)', 'Net cash from operating activities', 'Net cash used in investing activities',
-  'Net cash raised in financing activities', 'Net cash inflow for the year',
-  'Effect of exchange rate changes on cash and cash equivalents',
-  'Cash at the beginning of the year', 'Cash at the end of the year'
-)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 #Load corresponding geo-eng lineitems
