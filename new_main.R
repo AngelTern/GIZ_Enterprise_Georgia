@@ -50,6 +50,118 @@ for (file in excel_files) {
   data_list[[var_name]] <- read_excel(file)
 }
 
+# Filtering criteria
+
+## Columns to keep
+
+columns_to_keep_1st_revision <- c("ReportCode", "IdCode", "ReportYear", "FVYear", "CategoryMain", "FormName",
+                                  "SheetName", "LineItemGEO", "LineItemENG", "Value", "GEL", "LineItem")
+
+
+## Needed variables lists
+variables_financial_non_financial <- list('Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
+                                          'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
+                                          'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
+                                          'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
+                                          'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
+                                          'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
+                                          'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
+                                          'Share capital"'
+)
+
+variables_financial_other <- list('Cash and cash equivalents', 'Inventories', 'Trade receivables',
+                                  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
+                                  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
+                                  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
+                                  'Total equity', 'Total liabilities and equity')
+
+variables_profit_loss <- list('Net Revenue', 'Cost of goods sold', 'Gross profit', 'Other operating income',
+                              'Personnel expense', 'Rental expenses', 'Depreciation and amortisation',
+                              'Other administrative and operating expenses', 'Operating income', 
+                              'Impairment (loss)/reversal of financial assets', 'Net gain (loss) from foreign exchange operations', 'Dividends received',
+                              'Other net operating income/(expense)', 'Profit/(loss) before tax from continuing operations',
+                              'Income tax', 'Profit/(loss)', 'Revaluation reserve of property, plant and equipment',
+                              'Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)',
+                              'Total other comprehensive (loss) income', 'Total comprehensive income / (loss)')
+
+variables_cash_flow <- list('Net cash from operating activities', 'Net cash used in investing activities',
+                            'Net cash raised in financing activities', 'Net cash inflow for the year',
+                            'Effect of exchange rate changes on cash and cash equivalents',
+                            'Cash at the beginning of the year', 'Cash at the end of the year')
+
+
+#LineItem COrrection function
+
+correct_lineitems <- function(df) {
+  df <- df %>%
+    mutate(
+      LineItemENG = case_when(
+        LineItemENG == "Retained earnings (Accumulated deficit)" ~ "Retained earnings / (Accumulated deficit)",
+        LineItemENG == "Impairment loss/reversal of  financial assets" ~ "Impairment (loss)/reversal of financial assets",
+        LineItemENG == "Total comprehensive income" ~ "Total comprehensive income / (loss)",
+        LineItemENG == "Total comprehensive income(loss)" ~ "Total comprehensive income / (loss)",
+        LineItemENG == "Cash advances to other parties" ~ "Cash advances made to other parties",
+        LineItemENG == 'Share capital (in case of Limited Liability Company - "capital", in case of cooperative entity - "unit capital"' ~ "Share capital",
+        LineItemENG == "    - inventories" ~ "Inventories",
+        TRUE ~ LineItemENG
+      ),
+      LineItemGEO = case_when(
+        LineItemGEO == "ამონაგები" ~ "ნეტო ამონაგები",
+        LineItemGEO == "სხვა პირებზე ავანსებად და სესხებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსებად გაცემული ფულადი სახსრები",
+        TRUE ~ LineItemGEO
+      )
+      
+    )
+  return(df)
+}
+
+
+#Get variables for lookup table
+
+for (i in seq_along(data_list)) {
+  
+  # Check if 'LineItemENG' exists in the current dataframe
+  if ("LineItemENG" %in% colnames(data_list[[i]])) {
+    
+    # Access the current dataframe
+    df <- data_list[[i]] 
+    
+    # Step 1: Filter and process data
+    df <- df %>%
+      filter(!(SheetName == "საქმიანობის შედეგები" & LineItemENG == "Inventories"))
+    
+    # Step 2: Correct the line items
+    df_corrected <- correct_lineitems(df)
+    
+    # Step 3: Filter for financial_non_financial and print result
+    df_filtered_financial_non_financial <- df_corrected %>%
+      filter(FormName == "არაფინანსური ინსტიტუტებისთვის" & SheetName == "ფინანსური მდგომარეობა")
+    print(paste("All found in financial_non_financial:", 
+                all(variables_financial_non_financial %in% df_filtered_financial_non_financial$LineItemENG)))
+    
+    # Step 4: Filter for financial_other and print result
+    df_filtered_financial_other <- df_corrected %>%
+      filter(FormName != "არაფინანსური ინსტიტუტებისთვის" & SheetName == "ფინანსური მდგომარეობა")
+    print(paste("All found in financial_other:", 
+                all(variables_financial_other %in% df_filtered_financial_other$LineItemENG)))
+    
+    # Step 5: Filter for profit_loss and print result
+    df_filtered_profit_loss <- df_corrected %>%
+      filter(SheetName == "საქმიანობის შედეგები")
+    print(paste("All found in profit_loss:", 
+                all(variables_profit_loss %in% df_filtered_profit_loss$LineItemENG)))
+    
+    # Step 6: Filter for cash_flow and print result
+    df_filtered_cash_flow <- df_corrected %>%
+      filter(SheetName == "ფულადი სახსრების მოძრაობა")
+    print(paste("All found in cash_flow:", 
+                all(variables_cash_flow %in% df_filtered_cash_flow$LineItemENG)))
+  }
+}
+
+
+
+
 #Load corresponding geo-eng lineitems
 
 ##Load JSON file as list
@@ -90,45 +202,7 @@ uniform_data_list <- lapply(data_list, make_identical, lookup_table = lookup_tab
 
 
 
-# Filtering criteria
 
-## Columns to keep
-
-columns_to_keep_1st_revision <- c("ReportCode", "IdCode", "ReportYear", "FVYear", "CategoryMain", "FormName",
-                                  "SheetName", "LineItemGEO", "LineItemENG", "Value", "GEL", "LineItem")
-
-# Needed variables lists
-
-variables_financial_non_financial <- list('Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
-                                          'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
-                                          'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
-                                          'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
-                                          'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
-                                          'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
-                                          'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
-                                          'Share capital (in case of Limited Liability Company - "capital", in case of cooperative entity - "unit capital"'
-)
-
-variables_financial_other <- list('Cash and cash equivalents', 'Inventories', 'Trade receivables',
-                                  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
-                                  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
-                                  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
-                                  'Total equity', 'Total liabilities and equity')
-
-variables_profit_loss <- list('Net Revenue', 'Cost of goods sold', 'Gross profit', 'Other operating income',
-                              'Personnel expense', 'Rental expenses', 'Depreciation and amortisation',
-                              'Other administrative and operating expenses', 'Operating income', 
-                              'Impairment (loss)/reversal of financial assets', 'Inventories',
-                              'Net gain (loss) from foreign exchange operations', 'Dividends received',
-                              'Other net operating income/(expense)', 'Profit/(loss) before tax from continuing operations',
-                              'Income tax', 'Profit/(loss)', 'Revaluation reserve of property, plant and equipment',
-                              'Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)',
-                              'Total other comprehensive (loss) income', 'Total comprehensive income / (loss)')
-
-variables_cash_flow <- list('Net cash from operating activities', 'Net cash used in investing activities',
-                            'Net cash raised in financing activities', 'Net cash inflow for the year',
-                            'Effect of exchange rate changes on cash and cash equivalents',
-                            'Cash at the beginning of the year', 'Cash at the end of the year')
 
 # Function to filter out rows based on a condition
 
@@ -166,7 +240,7 @@ check_and_process_dfs <- function(dfs, columns_to_keep, variables_financial_non_
           TRUE ~ Value
         )
       ) %>%
-      filter(!(FormName == "non-financial institutions" & !LineItemENG %in% variables_financial_non_financial)) %>%
+      #filter(!(FormName == "non-financial institutions" & !LineItemENG %in% variables_financial_non_financial)) %>%
       filter(!(FormName == "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_non_financial)) %>%
       filter(!(FormName != "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_other)) %>%
       filter(!(SheetName == "profit-loss" & !LineItemENG %in% variables_profit_loss)) %>%
