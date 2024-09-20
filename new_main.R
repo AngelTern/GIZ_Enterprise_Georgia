@@ -3,6 +3,7 @@ library(dplyr)
 library(rstudioapi)
 #library(jsonlite)
 library(tidyr)
+library(ggplot2)
 
 if (requireNamespace("rstudioapi", quietly = TRUE)) {
   # Print a message indicating the script is running in RStudio
@@ -646,19 +647,164 @@ print("Unmatched IdCodes:")
 print(unmatched_idcodes)
 
 ###
-create_new_variables <- function(df, column1, column2, new_column_name){
-  if (all(c(column1, column2) %in% colnames(df))){
+#operator values "*", "/", "+", "-"
+create_new_variables <- function(df, column1, column2, new_column_name, operator){
+  if (all(c(column1, column2) %in% colnames(df))) {
+    
     df <- df %>%
       mutate(
-        !!new_column_name := ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]),
-                                    NA,
-                                    .data[[]])
+        !!new_column_name := case_when(
+          operator == "+" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
+                                   NA, 
+                                   .data[[column1]] + .data[[column2]]),
+          operator == "-" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
+                                   NA, 
+                                   .data[[column1]] - .data[[column2]]),
+          operator == "*" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
+                                   NA, 
+                                   .data[[column1]] * .data[[column2]]),
+          operator == "/" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
+                                   NA, 
+                                   .data[[column1]] / .data[[column2]]),
+          TRUE ~ NA_real_ 
+        )
       )
+    
+  } else {
+    cat("One or both of the specified columns do not exist in the dataframe.\n")
   }
+  
+  return(df)
 }
 
+##create Margin variable
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Profit/(loss)", "Net Revenue", "Margin", "/")
+##create Liabilities to Assets
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Total liabilities", "Total assets", "Liabilities to Assets", "/")
+##Create Total Borrowings, then Borrowings to assets
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Current borrowings", "Non current borrowings", "Total Borrowings", "+")
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Total Borrowings", "Total assets", "Borrowings to Assets", "/")
+##Create Cash to assets
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Cash and cash equivalents", "Total assets", "Cash to Assets", "/")
+##Create operating income to assets
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Operating income", "Total assets", "Operating income to Assets", "/")
+##Create Liabilities to Operating income
+final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Total liabilities", "Operating income", "Liabilities to Operating income", "/")
 
 
 
 
+# Function to plot columns vs percentiles with an option to apply percentile cutoffs
+plot_columns_vs_percentiles <- function(df, columns) {
+  
+  # Loop over each specified column
+  for (column_name in columns) {
+    
+    # Check if the column exists in the dataframe
+    if (column_name %in% colnames(df)) {
+      
+      # Get the original values from the column, along with their IdCode
+      data_with_id <- df %>%
+        select(IdCode, all_of(column_name)) %>%
+        drop_na()  # Remove NA values
+      
+      values <- sort(data_with_id[[column_name]])
+      
+      # Create percentiles (X axis) using empirical cumulative distribution function (ecdf)
+      percentiles <- ecdf(values)(values)
+      
+      # Create a dataframe for plotting
+      plot_data <- data.frame(Percentile = percentiles, Value = values)
+      
+      # Generate the plot
+      p <- ggplot(plot_data, aes(x = Percentile, y = Value)) +
+        geom_line() +
+        geom_point() +
+        labs(title = paste("Plot of", column_name, "vs Percentiles (Sorted)"),
+             x = "Percentiles",
+             y = "Sorted Values") +
+        theme_minimal()
+      
+      # Display the plot
+      print(p)
+      
+      # Ask the user if they want to apply percentile cutoffs
+      apply_cutoff <- readline(prompt = "Do you want to apply percentile cutoffs? (yes/no): ")
+      
+      # If the user chooses to apply cutoff
+      if (tolower(apply_cutoff) == "yes") {
+        
+        # Ask for the cutoff values from the beginning and the end
+        cutoff_start <- as.numeric(readline(prompt = "Enter the percentile to cut from the beginning (0-1): "))
+        cutoff_end <- as.numeric(readline(prompt = "Enter the percentile to cut from the end (0-1): "))
+        
+        # Ensure cutoff values are within valid range
+        if (!is.na(cutoff_start) && !is.na(cutoff_end) && cutoff_start >= 0 && cutoff_start <= 1 && cutoff_end >= 0 && cutoff_end <= 1) {
+          
+          # Filter the values based on the percentile cutoffs
+          values_filtered <- values[percentiles >= cutoff_start & percentiles <= (1 - cutoff_end)]
+          
+          # Retain only the rows where the values were not filtered out
+          retained_rows <- data_with_id[data_with_id[[column_name]] %in% values_filtered, ]
+          
+          # Drop rows from the original dataframe where IdCode is not in retained_rows
+          df <- df[df$IdCode %in% retained_rows$IdCode, ]
+          
+          cat(paste("Values for column", column_name, "trimmed based on percentiles, and corresponding rows have been dropped.\n"))
+          
+        } else {
+          cat("Invalid percentiles provided. Moving to the next plot.\n")
+        }
+        
+      } else {
+        cat(paste("No cutoff applied for column", column_name, ". Moving to the next plot.\n"))
+      }
+      
+    } else {
+      cat(paste("Column", column_name, "does not exist in the dataframe.\n"))
+    }
+  }
+  
+  cat("All plots have been displayed.\n")
+  return(df)
+}
 
+columns_to_check <- c("Margin", "Liabilities to Assets", "Borrowings to Assets", "Cash to Assets", "Operating income to Assets", "Liabilities to Operating income")
+
+final_wide_process <- plot_columns_vs_percentiles(final_wide_df_with_program, columns_to_check)
+
+###
+calculate_statistics_by_year <- function(df, columns) {
+  
+  summary_list <- list()
+  
+  for (column_name in columns) {
+    
+    if (column_name %in% colnames(df)) {
+      
+      summary_stats <- df %>%
+        group_by(FVYear) %>%
+        summarise(
+          Mean = mean(.data[[column_name]], na.rm = TRUE),
+          Median = median(.data[[column_name]], na.rm = TRUE),
+          Percentile_25 = quantile(.data[[column_name]], 0.25, na.rm = TRUE),
+          Percentile_75 = quantile(.data[[column_name]], 0.75, na.rm = TRUE)
+        ) %>%
+        mutate(Column = column_name)  # Add a column to identify the column name
+      
+      cat("\nSummary statistics for", column_name, "grouped by FVYear:\n")
+      print(summary_stats)
+      
+      summary_list[[column_name]] <- summary_stats
+      
+    } else {
+      cat(paste("Column", column_name, "does not exist in the dataframe.\n"))
+    }
+  }
+  
+  combined_summary_df <- bind_rows(summary_list)
+  
+  return(combined_summary_df)
+}
+
+summary_df <- calculate_statistics_by_year(final_wide_process, columns_to_check)
