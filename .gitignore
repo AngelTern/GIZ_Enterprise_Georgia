@@ -1,0 +1,19 @@
+# Ignore RStudio project files
+.Rproj.user/
+.Rhistory
+.RData
+main_environment.RData
+.RDataTmp
+.RDataTmp1
+.RDataTmp2
+
+# Ignore data files
+data_main/
+
+*.xlsx
+
+*.csv
+
+*.Rproj
+
+lineitem_data/
