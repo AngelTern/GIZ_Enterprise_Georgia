@@ -158,6 +158,46 @@ correct_lineitems <- function(df) {
   return(df)
 }
 
+correct_geo_dfs <- function(df) {
+  df <- df %>%
+    # Check if 'Category' or 'CategoryMain' exists before applying the filter
+    filter(if ("Category" %in% colnames(df)) Category != "III ჯგუფი" else if ("CategoryMain" %in% colnames(df)) CategoryMain != "III ჯგუფი" else TRUE) %>%
+    filter(FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)") %>%
+    
+    # Apply the corrections to FormName and SheetName
+    mutate(
+      FormName = case_when(
+        FormName == "არაფინანსური ინსტიტუტებისთვის" ~ "non-financial institutions",
+        FormName == "გამარტივებული ფორმები მესამე კატეგორიის საწარმოებისთვის" ~ "Cat III forms",
+        FormName == "მეოთხე კატეგორიის საწარმოთა ანგარიშგების ფორმები" ~ "Cat IV forms",
+        TRUE ~ FormName
+      ),
+      SheetName = case_when(
+        SheetName == "საქმიანობის შედეგები" ~ "profit-loss",
+        SheetName == "ფინანსური მდგომარეობა" ~ "financial position",
+        SheetName == "ფულადი სახსრების მოძრაობა" ~ "cash flow",
+        TRUE ~ SheetName
+      )
+    ) %>%
+    mutate(LineItem = case_when(
+      LineItem == "ამონაგები" ~ "ნეტო ამონაგები",
+      LineItem == "სხვა პირებზე ავანსებად და სესხებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსებად გაცემული ფულადი სახსრები",
+      TRUE ~ LineItem
+    )) %>%
+    
+    # Convert 'Value' to numeric if it exists
+    mutate(Value = if ("Value" %in% colnames(df)) as.numeric(Value) else Value) %>%
+    
+    # Adjust 'Value' for specific cases
+    mutate(
+      Value = case_when(
+        GEL == ".000 ლარი" & !is.na(Value) ~ Value * 1000,
+        TRUE ~ Value
+      )
+    )
+  return(df)
+}
+
 # Initialize two lists: one for adjusted dataframes, one for those without LineItemENG
 data_list_adjusted <- list()
 data_list_no_eng <- list()
@@ -170,8 +210,9 @@ for (i in seq_along(data_list)) {
   
   # Check if 'LineItemENG' exists in the current dataframe
   if (!"LineItemENG" %in% colnames(df)) {
-    # Save the dataframe to 'data_list_no_eng' if it does not have 'LineItemENG'
-    data_list_no_eng[[names(data_list)[i]]] <- df
+    # Correct the dataframe and save it into 'data_list_no_eng'
+    df_geo_corrected <- correct_geo_dfs(df)
+    data_list_no_eng[[names(data_list)[i]]] <- df_geo_corrected
   } else {
     # Step 1: Apply the specific filter only if LineItemENG exists
     df <- df %>%
@@ -340,6 +381,7 @@ lookup_table <- data.frame(
   Georgian = unlist(all_results$`DataFrame 1`$found)     # Corresponding Georgian LineItemGEO values
 )
 
+
 ###Reset row names to null
 rownames(lookup_table) <- NULL
 
@@ -358,6 +400,16 @@ make_identical <- function(df, lookup_table) {
   df <- df %>%
     filter(LineItemGEO %in% lookup_table$Georgian)
   
+  # Check for missing Georgian variables
+  missing_georgian_vars <- setdiff(lookup_table$Georgian, df$LineItemGEO)
+  
+  if (length(missing_georgian_vars) > 0) {
+    cat("Warning: The following Georgian variables were not found in the dataframe:\n")
+    print(missing_georgian_vars)
+  } else {
+    cat("All Georgian variables from the lookup table are found in the dataframe.\n")
+  }
+  
   # Check if 'LineItemENG' already exists, and only add it if it doesn't
   if (!"LineItemENG" %in% colnames(df)) {
     df <- df %>%
@@ -367,6 +419,7 @@ make_identical <- function(df, lookup_table) {
   
   return(df)
 }
+
 
 # Apply the function to dataframes in data_list_no_eng
 data_list_no_eng_adjusted <- lapply(data_list_no_eng, make_identical, lookup_table = lookup_table)
@@ -437,8 +490,8 @@ process_df_secondary <- function(df) {
         }
         
         # Extract the column data and check if it's numeric
-        column_data <- df[found_matches, column_to_check]
-        value_data <- df[found_matches, "Value"]
+        column_data <- df[[column_to_check]][found_matches]
+        value_data <- df[["Value"]][found_matches]
         
         # Convert column_data to numeric, handling any non-numeric values
         column_data_numeric <- suppressWarnings(as.numeric(as.character(column_data)))
@@ -492,24 +545,120 @@ final_processed_list <- lapply(nested_list_of_dfs_group_split, function(inner_li
 })
 
 transform_to_wide_format <- function(df) {
-  # Create the new column combining LineItemENG and the last 2 digits of FVYear
+  # Ensure Value is numeric
   df <- df %>%
-    mutate(LineItem_FVYear = paste0(LineItemENG, "_", substr(FVYear, 3, 4))) %>%
-    
-    # Ensure Value is numeric
     mutate(Value = as.numeric(Value))
   
+  # Group by IdCode, FVYear, and LineItemENG
+  df_grouped <- df %>%
+    group_by(IdCode, FVYear, LineItemENG) %>%
+    summarise(Value = sum(Value, na.rm = TRUE), .groups = 'drop')
+  
   # Transform the dataframe from long to wide format using pivot_wider
-  df_wide <- df %>%
-    select(ReportCode, LineItem_FVYear, Value) %>%
-    pivot_wider(names_from = LineItem_FVYear, values_from = Value)
+  df_wide <- df_grouped %>%
+    pivot_wider(names_from = LineItemENG, values_from = Value)
+  
+  # Optionally, reorder columns to have IdCode and FVYear at the front
+  df_wide <- df_wide %>%
+    select(IdCode, FVYear, everything())
   
   return(df_wide)
 }
 
-# Apply the function to each dataframe in a list of dataframes
-# combined_data_list is the list of dataframes
-final_wide_data_list <- lapply(combined_data_list, transform_to_wide_format)
+
+
+flattened_final_processed_list <- unlist(final_processed_list, recursive = FALSE)
+
+combined_df_processed <- bind_rows(flattened_final_processed_list)
+
+final_wide_df <- transform_to_wide_format(combined_df_processed)
+
+#Benefitiaries
+
+benefitiaries_path <- "benefitiaries_data.xlsx"
+
+beneficiaries_df <- read_excel(benefitiaries_path)
+
+
+beneficiaries_df <- beneficiaries_df %>%
+  rename(
+    IdCode = `ს/კ`,  # Changing ს/კ to RegistrationCode
+    ReportCode = `რეპორტ კოდი`,  # Changing რეპორტ კოდი to ReportCode
+    Program = პროგრამა  # Changing პროგრამა to Program
+  ) %>%
+  mutate(
+    Program = case_when(
+      Program == "ინდუსტრიული" ~ 1,
+      Program == "უნივერსალური" ~ 2,
+      Program == "საკრედიტო-საგარანტიო" ~ 3,
+      Program == "ორივე პროგრამით სარგებლობა" ~ 4,
+      TRUE ~ NA_real_ 
+    )
+  )
+
+
+# Step 1: Ensure 'IdCode' columns are of the same type in both data frames
+beneficiaries_df$IdCode <- as.character(beneficiaries_df$IdCode)
+final_wide_df$IdCode <- as.character(final_wide_df$IdCode)
+
+
+
+# Step 2: Identify IdCodes in beneficiaries_df that are present in final_wide_df
+matched_idcodes <- beneficiaries_df %>%
+  filter(IdCode %in% final_wide_df$IdCode)
+
+# Step 3: Identify IdCodes in beneficiaries_df that are not present in final_wide_df
+unmatched_idcodes <- beneficiaries_df %>%
+  filter(!IdCode %in% final_wide_df$IdCode)
+
+# Step 4: Merge matched_idcodes with final_wide_df
+# Combine the Program values for each IdCode by collapsing them into a single string
+beneficiaries_collapsed <- matched_idcodes %>%
+  group_by(IdCode) %>%
+  summarise(ProgramBeneficiary = paste(unique(Program), collapse = ","), .groups = "drop")
+
+# Perform the left join with final_wide_df
+final_wide_df_with_program <- final_wide_df %>%
+  left_join(beneficiaries_collapsed, by = "IdCode")
+
+# Perform the left join with final_wide_df
+final_wide_df_with_program <- final_wide_df %>%
+  left_join(beneficiaries_collapsed, by = "IdCode")
+
+
+# Step 5: Reorder columns to place 'ProgramBeneficiary' at the beginning
+# Get the names of the columns
+col_names <- names(final_wide_df_with_program)
+
+# Move 'ProgramBeneficiary' to the front
+final_wide_df_with_program <- final_wide_df_with_program %>%
+  select(ProgramBeneficiary, everything())
+
+# Now, final_wide_df_with_program has 'ProgramBeneficiary' as the first column.
+
+# Output the number of matched and unmatched IdCodes
+cat("Number of IdCodes in beneficiaries_df:", nrow(beneficiaries_df), "\n")
+cat("Number of IdCodes matched in final_wide_df:", nrow(matched_idcodes), "\n")
+cat("Number of IdCodes not matched:", nrow(unmatched_idcodes), "\n")
+
+# Optional: View the unmatched IdCodes
+print("Unmatched IdCodes:")
+print(unmatched_idcodes)
+
+###
+create_new_variables <- function(df, column1, column2, new_column_name){
+  if (all(c(column1, column2) %in% colnames(df))){
+    df <- df %>%
+      mutate(
+        !!new_column_name := ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]),
+                                    NA,
+                                    .data[[]])
+      )
+  }
+}
+
+
+
 
 
 
