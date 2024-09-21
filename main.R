@@ -4,6 +4,7 @@ library(rstudioapi)
 #library(jsonlite)
 library(tidyr)
 library(ggplot2)
+library(writexl)
 
 if (requireNamespace("rstudioapi", quietly = TRUE)) {
   # Print a message indicating the script is running in RStudio
@@ -663,7 +664,7 @@ create_new_variables <- function(df, column1, column2, new_column_name, operator
           operator == "*" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
                                    NA, 
                                    .data[[column1]] * .data[[column2]]),
-          operator == "/" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]), 
+          operator == "/" ~ ifelse(is.na(.data[[column1]]) | is.na(.data[[column2]]) | .data[[column2]] == 0, 
                                    NA, 
                                    .data[[column1]] / .data[[column2]]),
           TRUE ~ NA_real_ 
@@ -676,6 +677,7 @@ create_new_variables <- function(df, column1, column2, new_column_name, operator
   
   return(df)
 }
+
 
 ##create Margin variable
 final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "Profit/(loss)", "Net Revenue", "Margin", "/")
@@ -694,7 +696,7 @@ final_wide_df_with_program <- create_new_variables(final_wide_df_with_program, "
 
 
 
-# Function to plot columns vs percentiles with an option to apply percentile cutoffs
+'''# Function to plot columns vs percentiles with an option to apply percentile cutoffs
 plot_columns_vs_percentiles <- function(df, columns) {
   
   # Loop over each specified column
@@ -771,7 +773,7 @@ plot_columns_vs_percentiles <- function(df, columns) {
 
 columns_to_check <- c("Margin", "Liabilities to Assets", "Borrowings to Assets", "Cash to Assets", "Operating income to Assets", "Liabilities to Operating income")
 
-final_wide_processed <- plot_columns_vs_percentiles(final_wide_df_with_program, columns_to_check)
+final_wide_processed <- plot_columns_vs_percentiles(final_wide_df_with_program, columns_to_check)'''
 
 ###
 calculate_statistics_by_year <- function(df, columns) {
@@ -787,8 +789,15 @@ calculate_statistics_by_year <- function(df, columns) {
         summarise(
           Mean = mean(.data[[column_name]], na.rm = TRUE),
           Median = median(.data[[column_name]], na.rm = TRUE),
+          Percentile_1 = quantile(.data[[column_name]], 0.01, na.rm = TRUE),
+          Percentile_5 = quantile(.data[[column_name]], 0.05, na.rm = TRUE),
+          Percentile_10 = quantile(.data[[column_name]], 0.1, na.rm = TRUE),
           Percentile_25 = quantile(.data[[column_name]], 0.25, na.rm = TRUE),
-          Percentile_75 = quantile(.data[[column_name]], 0.75, na.rm = TRUE)
+          Percentile_50 = quantile(.data[[column_name]], 0.5, na.rm = TRUE),
+          Percentile_75 = quantile(.data[[column_name]], 0.75, na.rm = TRUE),
+          Percentile_90 = quantile(.data[[column_name]], 0.9, na.rm = TRUE),
+          Percentile_95 = quantile(.data[[column_name]], 0.95, na.rm = TRUE),
+          Percentile_99 = quantile(.data[[column_name]], 0.99, na.rm = TRUE),
         ) %>%
         mutate(Column = column_name)  # Add a column to identify the column name
       
@@ -807,14 +816,75 @@ calculate_statistics_by_year <- function(df, columns) {
   return(combined_summary_df)
 }
 
-summary_df <- calculate_statistics_by_year(final_wide_processed, columns_to_check)
+###Processed Statistic
+###Margin process
+df_wide_margin <- final_wide_df_with_program %>%
+  filter(Margin > -1 & Margin < 1)
+
+df_wide_margin_beneficiaries <- df_wide_margin %>%
+  filter(!is.na(ProgramBeneficiary))
+df_wide_margin_non_beneficiaries <- df_wide_margin %>%
+  filter(is.na(ProgramBeneficiary))
+
+summary_margin_beneficiaries <- calculate_statistics_by_year(df_wide_margin_beneficiaries, "Margin")
+summary_margin_non_beneficiaries <- calculate_statistics_by_year(df_wide_margin_non_beneficiaries, "Margin")
+
+##Drop percentails
+drop_percentiles_for_column <- function(df, column_name) {
+  # Calculate the 1st and 99th percentiles for the specified column 
+  lower_bound <- quantile(df[[column_name]], 0.01, na.rm = TRUE)
+  upper_bound <- quantile(df[[column_name]], 0.99, na.rm = TRUE)
+  
+  # Filter the dataframe based on these percentiles for the specific column
+  df_filtered <- df %>%
+    filter(df[[column_name]] >= lower_bound & df[[column_name]] <= upper_bound)
+  
+  return(df_filtered)
+}
+##
+###Liabilites to operating process
+df_wide_liabilities_to_operating <- drop_percentiles_for_column(final_wide_df_with_program, "Liabilities to Operating income")
+df_wide_liabilities_to_operating_beneficiaries <- df_wide_liabilities_to_operating %>%
+  filter(!is.na(ProgramBeneficiary))
+df_wide_liabilities_to_operating_non_beneficiaries <- df_wide_liabilities_to_operating %>%
+  filter(is.na(ProgramBeneficiary))
+
+summary_liabilities_to_operating_beneficiaries <- calculate_statistics_by_year(df_wide_liabilities_to_operating_beneficiaries, "Liabilities to Operating income")
+summary_liabilities_to_operating_non_beneficiaries <- calculate_statistics_by_year(df_wide_liabilities_to_operating_non_beneficiaries, "Liabilities to Operating income")
+
+###Operating to assets process
+df_wide_operating_to_assets <- drop_percentiles_for_column(final_wide_df_with_program, "Operating income to Assets")
+df_wide_operating_to_assets_beneficiaries <- df_wide_operating_to_assets %>%
+  filter(!is.na(ProgramBeneficiary))
+df_wide_operating_to_assets_non_beneficiaries <- df_wide_operating_to_assets %>%
+  filter(!is.na(ProgramBeneficiary))
+
+summary_operating_to_assets_beneficiaries <- calculate_statistics_by_year(df_wide_operating_to_assets_beneficiaries, "Operating income to Assets")
+summary_operating_to_assets_non_beneficiaries <- calculate_statistics_by_year(df_wide_operating_to_assets_non_beneficiaries, "Operating income to Assets")
+
+###Split main df
+###Summary for columns that did not need processing
+final_wide_df_with_program_beneficiaries <- final_wide_df_with_program %>%
+  filter(!is.na(ProgramBeneficiary))
+final_wide_df_with_program_non_beneficiaries <- final_wide_df_with_program %>%
+  filter(is.na(ProgramBeneficiary))
+unporcessed_columns <- c("Liabilites to Assets", "Borrowings to Assets", "Cash to Assets")
+
+summary_for_unprocessed_beneficiaries <- calculate_statistics_by_year(final_wide_df_with_program_beneficiaries, unporcessed_columns)
+summary_for_unprocessed_non_beneficiaries <- calculate_statistics_by_year(final_wide_df_with_program_non_beneficiaries, unporcessed_columns)
+
+summary_beneficiaries <- bind_rows(summary_margin_beneficiaries, summary_liabilities_to_operating_beneficiaries,
+                                      summary_operating_to_assets_beneficiaries, summary_for_unprocessed_beneficiaries)
+
+summary_non_beneficiaries <- bind_rows(summary_margin_non_beneficiaries, summary_liabilities_to_operating_non_beneficiaries,
+                                       summary_operating_to_assets_non_beneficiaries, summary_for_unprocessed_non_beneficiaries)
 
 #####
-write_xlsx(summary_df, "summary_df.xslx")
-write.csv(summary_df, "summary_df.csv")
+write_xlsx(summary_beneficiaries, "final/summary_beneficiaries.xlsx")
+write.csv(summary_beneficiaries, "final/summary_beneficiaries.csv")
 
-write_xlsx(final_wide_processed, "final_data.xslx")
-write.csv(final_wide_processed, "final_data.csv")
+write_xlsx(summary_non_beneficiaries, "final/summary_non_beneficiaries.xlsx")
+write.csv(summary_non_beneficiaries, "final/summary_non_beneficiaries.csv")
 
-
-
+write_xlsx(final_wide_df_with_program, "final/final_data.xlsx")
+write.csv(final_wide_df_with_program, "final/final_data.csv")
