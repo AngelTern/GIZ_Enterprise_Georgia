@@ -29,7 +29,7 @@ if (requireNamespace("rstudioapi", quietly = TRUE)) {
   stop("This script requires RStudio to run.")
 }
 
-# List all Excel files in the 'data_main' directory within the script's directory
+# List all Excel files in the 'data_cat_4' directory within the script's directory
 excel_files <- list.files(file.path(script_dir, "data_main"), pattern = "\\.xlsx$", full.names = TRUE)
 
 # Function to create valid R list element names from file names
@@ -54,36 +54,164 @@ for (file in excel_files) {
   data_list[[var_name]] <- read_excel(file)
 }
 
+#Verify column types
+
+check_column_type_consistency <- function(data_list) {
+  # Helper function to get column types for a single data frame
+  get_column_types <- function(df) {
+    sapply(df, class)
+  }
+  
+  # Step 1: Get column types for each data frame
+  column_types_list <- lapply(data_list, get_column_types)
+  
+  # Step 2: Determine the standard column type for each column
+  all_columns <- unique(unlist(lapply(column_types_list, names)))
+  standard_types <- list()
+  
+  for (col in all_columns) {
+    # Collect types for the column across all data frames where it exists
+    column_types <- unlist(lapply(column_types_list, function(types) {
+      if (col %in% names(types)) types[col] else NA
+    }))
+    
+    # Remove NA values and determine the most common type
+    column_types <- column_types[!is.na(column_types)]
+    if (length(column_types) > 0) {
+      standard_types[[col]] <- names(sort(table(column_types), decreasing = TRUE))[1]
+    }
+  }
+  
+  # Step 3: Check for deviations from the standard type
+  deviations <- list()
+  
+  for (df_name in names(data_list)) {
+    df <- data_list[[df_name]]
+    df_types <- get_column_types(df)
+    
+    for (col in names(df_types)) {
+      if (col %in% names(standard_types)) {
+        if (df_types[col] != standard_types[[col]]) {
+          # Record the deviation
+          deviations[[df_name]] <- c(
+            deviations[[df_name]],
+            paste0("Column '", col, "' is of type '", df_types[col],
+                   "' but should be '", standard_types[[col]], "'.")
+          )
+        }
+      }
+    }
+  }
+  
+  # Step 4: Print results
+  if (length(deviations) > 0) {
+    cat("Deviations in column types:\n")
+    for (df_name in names(deviations)) {
+      cat("\nDataFrame:", df_name, "\n")
+      cat(paste(deviations[[df_name]], collapse = "\n"), "\n")
+    }
+  } else {
+    cat("All columns have consistent types across data frames.\n")
+  }
+  
+  # Return the standard types for reference
+  return(standard_types)
+}
+
+# Example usage
+standard_types <- check_column_type_consistency(data_list)
+
+#Adjust deviating columns
+adjust_column_type_deviations <- function(data_list, standard_types) {
+  # Function to coerce a column to a specific type
+  coerce_column_type <- function(column, target_type) {
+    if (target_type == "character") {
+      return(as.character(column))
+    } else if (target_type == "numeric") {
+      return(as.numeric(column))
+    } else if (target_type == "integer") {
+      return(as.integer(column))
+    } else if (target_type == "logical") {
+      return(as.logical(column))
+    } else if (target_type == "factor") {
+      return(as.factor(column))
+    } else {
+      stop(paste("Unsupported target type:", target_type))
+    }
+  }
+  
+  # Adjust each data frame in the list
+  adjusted_data_list <- lapply(data_list, function(df) {
+    for (col in names(standard_types)) {
+      if (col %in% colnames(df)) {
+        current_type <- class(df[[col]])
+        target_type <- standard_types[[col]]
+        if (current_type != target_type) {
+          cat(paste("Adjusting column", col, "from", current_type, "to", target_type, "\n"))
+          df[[col]] <- coerce_column_type(df[[col]], target_type)
+        }
+      }
+    }
+    return(df)
+  })
+  
+  return(adjusted_data_list)
+}
+
+adjusted_data_list <- adjust_column_type_deviations(data_list, standard_types)
+
+
 # Define the columns to keep during the initial filtering of data
 columns_to_keep_1st_revision <- c(
   "ReportCode", "IdCode", "ReportYear", "FVYear", "CategoryMain", "FormName",
   "SheetName", "LineItemGEO", "LineItemENG", "Value", "GEL", "LineItem"
 )
 
-# Define lists of necessary variables for different financial statements
+# Define lists of necessary variables for different financial statements for CAT III
+####
+#variables_financial_non_financial <- list(
+#  'Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
+#  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
+#  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
+#  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
+#  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
+#  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
+#  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
+#  'Share capital'
+#)
+
 variables_financial_non_financial <- list(
-  'Cash and cash equivalents', 'Current Inventory', 'Non current inventory', 'Trade receivables',
-  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
-  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
-  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
-  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
-  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
-  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
-  'Share capital'
+  "Cash and cash equivalents", "Current Inventory", "Non current inventory", "Trade receivables", 
+  "Biological assets", "Other current assets", "Other non current assets", 
+  "Property, plant and equipment", "Total assets", "Trade payables", 
+  "Provisions for liabilities and charges", "Total liabilities", 
+  "Share premium", "Treasury shares", 
+  "Retained earnings / (Accumulated deficit)", "Other reserves", 
+  "Total equity", "Total liabilities and equity"
 )
+
+#variables_financial_other <- list(
+#  'Cash and cash equivalents', 'Inventories', 'Trade receivables',
+#  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
+#  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
+#  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
+#  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
+#  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
+#  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
+#  'Share capital'
+#)
 
 variables_financial_other <- list(
-  'Cash and cash equivalents', 'Inventories', 'Trade receivables',
-  'Biological assets', 'Other current assets', 'Other non current assets', 'Property, plant and equipment',
-  'Total assets', 'Trade payables', 'Provisions for liabilities and charges', 'Total liabilities',
-  'Share premium', 'Treasury shares', 'Retained earnings / (Accumulated deficit)', 'Other reserves',
-  'Total equity', 'Total liabilities and equity', 'Cash advances made to other parties', 'Investment property',
-  'Investments in subsidiaries', 'Goodwill', 'Other intangible assets', 'Finance lease payable', 'Unearned income',
-  'Current borrowings', 'Non current borrowings', 'Received grants', 'Total current assets', 'Total current liabilities',
-  'Share capital'
+  "Cash and cash equivalents", "Inventories", "Trade receivables", 
+  "Biological assets", "Other current assets", "Other non current assets", 
+  "Property, plant and equipment", "Total assets", "Trade payables", 
+  "Provisions for liabilities and charges", "Total liabilities", 
+  "Share premium", "Treasury shares", 
+  "Retained earnings / (Accumulated deficit)", "Other reserves", 
+  "Total equity", "Total liabilities and equity"
 )
 
-variables_profit_loss <- list(
+"variables_profit_loss <- list(
   'Net Revenue', 'Cost of goods sold', 'Gross profit', 'Other operating income',
   'Personnel expense', 'Rental expenses', 'Depreciation and amortisation',
   'Other administrative and operating expenses', 'Operating income', 
@@ -92,6 +220,21 @@ variables_profit_loss <- list(
   'Income tax', 'Profit/(loss)', 'Revaluation reserve of property, plant and equipment',
   'Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)',
   'Total other comprehensive (loss) income', 'Total comprehensive income / (loss)'
+)"
+
+variables_profit_loss <- list(
+  "Net Revenue", "Cost of goods sold", "Gross profit", 
+  "Other operating income", "Personnel expense", "Rental expenses", 
+  "Depreciation and amortisation", "Other administrative and operating expenses", 
+  "Operating income", "Impairment (loss)/reversal of financial assets", 
+  "Inventories", "Net gain (loss) from foreign exchange operations", 
+  "Dividends received", "Other net operating income/(expense)", 
+  "Profit/(loss) before tax from continuing operations", "Income tax", 
+  "Profit/(loss)", 
+  "Revaluation reserve of property, plant and equipment", 
+  "Other (include Share of associates and joint ventures in revaluation reserve of property, plant and equipment and defined benefit obligation)", 
+  "Total other comprehensive (loss) income", 
+  "Total comprehensive income / (loss)"
 )
 
 variables_cash_flow <- list(
@@ -101,19 +244,21 @@ variables_cash_flow <- list(
   'Cash at the beginning of the year', 'Cash at the end of the year'
 )
 
+
 # Initialize lists to store adjusted data frames and data frames without 'LineItemENG'
 data_list_adjusted <- list()
 data_list_no_eng <- list()
 
 # Function to correct and clean data frames that contain 'LineItemENG' column
-correct_lineitems <- function(df) {
+# Adjusted to accept 'is_IV' parameter
+# Function to correct and clean data frames that contain 'LineItemENG' column
+correct_lineitems <- function(df, is_IV) {
   df <- df %>%
-    # Filter out rows where 'CategoryMain' is 'III ჯგუფი' (exclude group III)
+    # Exclude group III
     filter(CategoryMain != "III ჯგუფი") %>%
-    # Exclude financial institutions (except insurers) from 'FormName'
+    #filter(if (!is_IV) FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)" else TRUE) %>%
     filter(FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)") %>%
-    
-    # Standardize 'FormName' and 'SheetName' values by replacing Georgian names with English equivalents
+    # Standardize 'FormName' and 'SheetName'
     mutate(
       FormName = case_when(
         FormName == "არაფინანსური ინსტიტუტებისთვის" ~ "non-financial institutions",
@@ -128,8 +273,7 @@ correct_lineitems <- function(df) {
         TRUE ~ SheetName
       )
     ) %>%
-    
-    # Correct inconsistencies in 'LineItemENG' and 'LineItemGEO' values
+    # Correct inconsistencies in 'LineItemENG' and 'LineItemGEO'
     mutate(
       LineItemENG = case_when(
         LineItemENG == "Retained earnings (Accumulated deficit)" ~ "Retained earnings / (Accumulated deficit)",
@@ -146,54 +290,81 @@ correct_lineitems <- function(df) {
         LineItemGEO == "ამონაგები" ~ "ნეტო ამონაგები",
         LineItemGEO == "სხვა პირებზე ავანსებად და სესხებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
         LineItemGEO == "სხვა მხარეებზე ავანსებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
+        LineItemGEO == "გაუფასურების (ხარჯი) / აღდგენა ფინანსურ აქტივებზე" ~ "ფინანსური აქტივების გაუფასურების (ხარჯი) / აღდგენა",
+        LineItemGEO == "საემისიო კაპიტალი" ~ "საემისიო შემოსავალი",
+        LineItemGEO == "მოგება / (ზარალი)" ~ "საანგარიშგებო პერიოდის მოგება / ზარალი",
+        LineItemGEO == "მარაგების გაუფასურების (ხარჯი) / აღდგენა" ~ "მარაგები",
+        LineItemGEO == "ნეტო ფულადი სახსრები საოპერაციო საქმიანობიდან" ~ "საოპერაციო საქმიანობიდან წარმოქმნილი (საოპერაციო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები",
+        LineItemGEO == "საინვესტიციო საქმიანობაში გამოყენებული ნეტო ფულადი სახსრები" ~ "საინვესტიციო საქმიანობიდან წარმოქმნილი (საინვესტიციო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები",
+        LineItemGEO == "ნეტო ფულადი სახსრები საფინანსო საქმიანობიდან" ~ "საფინანსო საქმიანობიდან წარმოქმნილი (საფინანსო საქმიანობაში გამოყენებული) წმინდა ფულადი ნაკადები",
+        LineItemGEO == "ნეტო ფულადი სახსრების შემოსვლა ან (გასვლა) წლის განმავლობაში" ~ "ფულადი სახსრების შემოსვლა (გასვლა)",
+        LineItemGEO == "სავალუტო კურსის ეფექტი" ~ "ვალუტის  კურსის ცვლილების გავლენა ფულად სახსრებსა და მათ ეკვივალენტებზე",
+        LineItemGEO == "ფულადი სახსრები წლის დასაწყისისათვის" ~ "ფულადი სახსრები და მათი ეკვივალენტები საანგარიშგებო პერიოდის დასაწყისში",
+        LineItemGEO == "ფულადი სახსრები წლის ბოლოს" ~ "ფულადი სახსრები და მათი ეკვივალენტები საანგარიშგებო პერიოდის ბოლოს",
         TRUE ~ LineItemGEO
       )
     ) %>%
-    
-    # Convert 'Value' column to numeric, if it exists
-    mutate(Value = if ("Value" %in% colnames(df)) as.numeric(Value) else Value) %>%
-    
-    # Adjust 'Value' based on 'GEL' column; multiply by 1000 if 'GEL' is '.000 ლარი' and 'Value' is not NA
+    # Convert 'Value' to numeric
+    mutate(Value = as.numeric(Value)) %>%
+    # Adjust 'Value' based on 'GEL' column
     mutate(
       Value = case_when(
         GEL == ".000 ლარი" & !is.na(Value) ~ Value * 1000,
         TRUE ~ Value
       )
-    ) %>%
-    
-    # Apply filtering based on 'FormName', 'SheetName', and whether 'LineItemENG' is in the predefined variables lists
-    filter(
-      !(FormName == "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_non_financial)
-    ) %>%
-    filter(
-      !(FormName != "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_other)
-    ) %>%
-    filter(
-      !(SheetName == "profit-loss" & !LineItemENG %in% variables_profit_loss)
-    ) %>%
-    filter(
-      !(SheetName == "cash flow" & !LineItemENG %in% variables_cash_flow)
-    ) %>%
-    
-    # Arrange the data frame by 'ReportCode' for better organization
-    arrange(ReportCode)
+    )
+  
+  # Apply filtering based on 'SheetName' and appropriate variables
+  if (is_IV) {
+    # For Category IV, filter based only on 'SheetName' and relevant variables
+    df <- df %>%
+      filter(
+        !(FormName == "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_non_financial)
+      ) %>%
+      filter(
+        !(FormName != "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_other)
+      ) %>%
+      filter(
+        !(SheetName == "profit-loss" & !LineItemENG %in% variables_profit_loss)
+      ) %>%
+      filter(
+        !(SheetName == "cash flow" & !LineItemENG %in% variables_cash_flow)
+      )
+  } else {
+    # For other categories, include 'FormName' and 'variables_financial_non_financial' in filters
+    df <- df %>%
+      filter(
+        !(FormName == "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_non_financial)
+      ) %>%
+      filter(
+        !(FormName != "non-financial institutions" & SheetName == "financial position" & !LineItemENG %in% variables_financial_other)
+      ) %>%
+      filter(
+        !(SheetName == "profit-loss" & !LineItemENG %in% variables_profit_loss)
+      ) %>%
+      filter(
+        !(SheetName == "cash flow" & !LineItemENG %in% variables_cash_flow)
+      )
+  }
+  
+  df <- df %>% arrange(ReportCode)
   
   return(df)
 }
 
+
 # Function to correct and clean data frames that do not contain 'LineItemENG' column
-correct_geo_dfs <- function(df) {
+correct_geo_dfs <- function(df, is_IV) {
   df <- df %>%
-    # Exclude group III if 'Category' or 'CategoryMain' column exists
+    # Exclude group III
     filter(
       if ("Category" %in% colnames(df)) Category != "III ჯგუფი"
       else if ("CategoryMain" %in% colnames(df)) CategoryMain != "III ჯგუფი"
       else TRUE
     ) %>%
-    # Exclude financial institutions (except insurers) from 'FormName'
+    # Exclude financial institutions if not Category IV
     filter(FormName != "ფინანსური ინსტიტუტებისთვის (გარდა მზღვეველებისა)") %>%
-    
-    # Standardize 'FormName' and 'SheetName' values by replacing Georgian names with English equivalents
+    # Standardize 'FormName' and 'SheetName'
     mutate(
       FormName = case_when(
         FormName == "არაფინანსური ინსტიტუტებისთვის" ~ "non-financial institutions",
@@ -208,19 +379,21 @@ correct_geo_dfs <- function(df) {
         TRUE ~ SheetName
       )
     ) %>%
-    
     # Correct inconsistencies in 'LineItem' (Georgian names)
-    mutate(LineItem = case_when(
-      LineItemGEO == "ამონაგები" ~ "ნეტო ამონაგები",
-      LineItemGEO == "სხვა პირებზე ავანსებად და სესხებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
-      LineItemGEO == "სხვა მხარეებზე ავანსებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
-      TRUE ~ LineItemGEO
-    )) %>%
-    
-    # Convert 'Value' column to numeric, if it exists
-    mutate(Value = if ("Value" %in% colnames(df)) as.numeric(Value) else Value) %>%
-    
-    # Adjust 'Value' based on 'GEL' column; multiply by 1000 if 'GEL' is '.000 ლარი' and 'Value' is not NA
+    mutate(
+      LineItem = case_when(
+        LineItem == "ამონაგები" ~ "ნეტო ამონაგები",
+        LineItem == "სხვა პირებზე ავანსებად და სესხებად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
+        LineItem == "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები" ~ "სხვა მხარეებზე ავანსად გაცემული ფულადი სახსრები",
+        LineItem == "გაუფასურების (ხარჯი) / აღდგენა ფინანსურ აქტივებზე" ~ "ფინანსური აქტივების გაუფასურების (ხარჯი) / აღდგენა",
+        LineItem == "საემისიო კაპიტალი" ~ "საემისიო შემოსავალი",
+        LineItem == "მოგება / (ზარალი)" ~ "საანგარიშგებო პერიოდის მოგება / ზარალი",
+        TRUE ~ LineItem
+      )
+    ) %>%
+    # Convert 'Value' to numeric
+    mutate(Value = as.numeric(Value)) %>%
+    # Adjust 'Value' based on 'GEL' column
     mutate(
       Value = case_when(
         GEL == ".000 ლარი" & !is.na(Value) ~ Value * 1000,
@@ -228,72 +401,107 @@ correct_geo_dfs <- function(df) {
       )
     )
   
+  
   return(df)
 }
+
 
 # Iterate over each data frame in 'data_list' and process accordingly
 for (i in seq_along(data_list)) {
   # Access the current data frame
   df <- data_list[[i]] 
   
+  # Get the name of the current data frame
+  df_name <- names(data_list)[i]
+  
+  # Determine if the data frame name contains "IV" (case-insensitive)
+  is_IV <- grepl("IV", df_name, ignore.case = TRUE)
+  
   # Check if 'LineItemENG' exists in the current data frame
   if (!"LineItemENG" %in% colnames(df)) {
-    # Correct the data frame and save it into 'data_list_no_eng'
-    df_geo_corrected <- correct_geo_dfs(df)
-    data_list_no_eng[[names(data_list)[i]]] <- df_geo_corrected
+    # Correct the data frame and save it into 'data_list_no_eng', passing 'is_IV'
+    df_geo_corrected <- correct_geo_dfs(df, is_IV)
+    data_list_no_eng[[df_name]] <- df_geo_corrected
   } else {
     # Remove incorrect entries where 'LineItemENG' is 'Inventories' in 'profit-loss' sheet
     df <- df %>%
       filter(!(SheetName == "profit-loss" & LineItemENG == "Inventories"))
     
-    # Correct the line items using the 'correct_lineitems' function
-    df_corrected <- correct_lineitems(df)
+    # Correct the line items using the 'correct_lineitems' function with 'is_IV' parameter
+    df_corrected <- correct_lineitems(df, is_IV)
     
     # Save the corrected data frame to 'data_list_adjusted'
-    data_list_adjusted[[names(data_list)[i]]] <- df_corrected
+    data_list_adjusted[[df_name]] <- df_corrected
     
-    # Check and print variables for financial sections
-    # Filter for non-financial institutions in 'financial position' sheet
-    df_filtered_financial_non_financial <- df_corrected %>%
-      filter(FormName == "non-financial institutions" & SheetName == "financial position")
-    
-    # Check if all required variables are present
-    if (all(variables_financial_non_financial %in% df_filtered_financial_non_financial$LineItemENG) == TRUE) {
-      print(paste("All variables found in financial_non_financial for", names(data_list)[i], ":", TRUE))
+    # Perform variable checking and print statements
+    if (!is_IV) {
+      # For non-Category IV data frames
+      
+      # Check and print variables for financial sections
+      # Filter for non-financial institutions in 'financial position' sheet
+      df_filtered_financial_non_financial <- df_corrected %>%
+        filter(FormName == "non-financial institutions" & SheetName == "financial position")
+      
+      # Check if all required variables are present
+      if (all(variables_financial_non_financial %in% df_filtered_financial_non_financial$LineItemENG)) {
+        print(paste("All variables found in financial_non_financial for", df_name, ":", TRUE))
+      } else {
+        missing_vars <- setdiff(variables_financial_non_financial, df_filtered_financial_non_financial$LineItemENG)
+        print(paste("Variables not found in financial_non_financial for", df_name, ":", 
+                    paste(missing_vars, collapse = ", ")))
+      }
+      
+      # Repeat the process for 'financial_other' variables
+      df_filtered_financial_other <- df_corrected %>%
+        filter(FormName != "non-financial institutions" & SheetName == "financial position")
+      
+      if (all(variables_financial_other %in% df_filtered_financial_other$LineItemENG)) {
+        print(paste("All variables found in financial_other for", df_name, ":", TRUE))
+      } else {
+        missing_vars <- setdiff(variables_financial_other, df_filtered_financial_other$LineItemENG)
+        print(paste("Variables not found in financial_other for", df_name, ":", 
+                    paste(missing_vars, collapse = ", ")))
+      }
     } else {
-      print(paste("Variables not found in financial_non_financial for", names(data_list)[i], ":", 
-                  setdiff(variables_financial_non_financial, df_filtered_financial_non_financial$LineItemENG)))
+      # For Category IV data frames
+      
+      # Check variables only based on 'SheetName' and appropriate variables lists
+      
+      # Financial Position sheet
+      df_filtered_financial_position <- df_corrected %>%
+        filter(SheetName == "financial position")
+      
+      if (all(variables_financial_other %in% df_filtered_financial_position$LineItemENG)) {
+        print(paste("All variables found in financial_position for", df_name, ":", TRUE))
+      } else {
+        missing_vars <- setdiff(variables_financial_other, df_filtered_financial_position$LineItemENG)
+        print(paste("Variables not found in financial_position for", df_name, ":", 
+                    paste(missing_vars, collapse = ", ")))
+      }
     }
     
-    # Repeat the process for 'financial_other', 'profit_loss', and 'cash_flow' variables
-    df_filtered_financial_other <- df_corrected %>%
-      filter(FormName != "non-financial institutions" & SheetName == "financial position")
-    
-    if (all(variables_financial_other %in% df_filtered_financial_other$LineItemENG) == TRUE) {
-      print(paste("All variables found in financial_other for", names(data_list)[i], ":", TRUE))
-    } else {
-      print(paste("Variables not found in financial_other for", names(data_list)[i], ":", 
-                  setdiff(variables_financial_other, df_filtered_financial_other$LineItemENG)))
-    }
-    
+    # Check 'profit_loss' variables
     df_filtered_profit_loss <- df_corrected %>%
       filter(SheetName == "profit-loss")
     
-    if (all(variables_profit_loss %in% df_filtered_profit_loss$LineItemENG) == TRUE) {
-      print(paste("All variables found in profit_loss for", names(data_list)[i], ":", TRUE))
+    if (all(variables_profit_loss %in% df_filtered_profit_loss$LineItemENG)) {
+      print(paste("All variables found in profit_loss for", df_name, ":", TRUE))
     } else {
-      print(paste("Variables not found in profit_loss for", names(data_list)[i], ":", 
-                  setdiff(variables_profit_loss, df_filtered_profit_loss$LineItemENG)))
+      missing_vars <- setdiff(variables_profit_loss, df_filtered_profit_loss$LineItemENG)
+      print(paste("Variables not found in profit_loss for", df_name, ":", 
+                  paste(missing_vars, collapse = ", ")))
     }
     
+    # Check 'cash_flow' variables
     df_filtered_cash_flow <- df_corrected %>%
       filter(SheetName == "cash flow")
     
-    if (all(variables_cash_flow %in% df_filtered_cash_flow$LineItemENG) == TRUE) {
-      print(paste("All variables found in cash_flow for", names(data_list)[i], ":", TRUE))
+    if (all(variables_cash_flow %in% df_filtered_cash_flow$LineItemENG)) {
+      print(paste("All variables found in cash_flow for", df_name, ":", TRUE))
     } else {
-      print(paste("Variables not found in cash_flow for", names(data_list)[i], ":", 
-                  setdiff(variables_cash_flow, df_filtered_cash_flow$LineItemENG)))
+      missing_vars <- setdiff(variables_cash_flow, df_filtered_cash_flow$LineItemENG)
+      print(paste("Variables not found in cash_flow for", df_name, ":", 
+                  paste(missing_vars, collapse = ", ")))
     }
   }
 }
@@ -331,24 +539,41 @@ check_unique_geo_values <- function(df, variables_list) {
 # Initialize an empty list to store the results for all data frames
 all_results <- list()
 
+# Initialize a list to collect unique FormName values for each data frame
+form_names_by_df <- list()
+
 # Iterate over each data frame in 'data_list_adjusted' and store the result
-for (i in seq_along(data_list_adjusted)) {
-  if ("LineItemENG" %in% colnames(data_list_adjusted[[i]])) {
-    df <- data_list_adjusted[[i]]
+for (df_name in names(data_list_adjusted)) {
+  if ("LineItemENG" %in% colnames(data_list_adjusted[[df_name]])) {
+    df <- data_list_adjusted[[df_name]]
     
     # Call the function and store the result in a named list
     result <- check_unique_geo_values(df, combined_variable_list)
     
+    # Collect unique FormName values for the current data frame
+    form_names <- unique(df$FormName)
+    form_names_by_df[[df_name]] <- form_names  # Store FormName values for each data frame
+    
     # Store the result for each data frame in a named element of 'all_results'
-    all_results[[paste("DataFrame", i)]] <- result
+    all_results[[df_name]] <- result
     
     # Output the found and missing variables for this data frame
-    cat(paste("\nFor DataFrame", i, ":\n"))
+    cat(paste("\nFor DataFrame", df_name, ":\n"))
     
     # Print found variables and their corresponding 'LineItemGEO'
     if (length(result$found) > 0) {
       cat("Found variables and their LineItemGEO values:\n")
       print(result$found)
+      
+      # Identify and print English variables with more than one Georgian pair
+      for (eng_var in names(result$found)) {
+        georgian_pairs <- result$found[[eng_var]]
+        if (length(georgian_pairs) > 1) {
+          cat(paste("English variable with multiple Georgian pairs:", eng_var, "\n"))
+          cat("Georgian pairs:\n")
+          print(georgian_pairs)
+        }
+      }
     }
     
     # Print missing variables
@@ -361,15 +586,24 @@ for (i in seq_along(data_list_adjusted)) {
   }
 }
 
+# Add the FormName values for each data frame as a sublist to 'all_results'
+all_results$FormNames_By_DataFrame <- form_names_by_df
+
 # Function to check the consistency of 'LineItemENG'-'LineItemGEO' pairs across data frames
 check_consistency_across_dataframes <- function(all_results) {
+  # Get the list of data frame names
+  df_names <- names(all_results)
+  
+  # Remove 'FormNames_By_DataFrame' from the list
+  df_names <- df_names[df_names != "FormNames_By_DataFrame"]
+  
   # Initialize the reference mapping using the first data frame's results
-  reference_pairs <- all_results[[1]]$found
+  reference_pairs <- all_results[[df_names[1]]]$found
   inconsistent_pairs <- list()  # To store inconsistencies found
   
   # Iterate through each subsequent data frame's results and compare
-  for (i in 2:length(all_results)) {
-    current_pairs <- all_results[[i]]$found
+  for (i in 2:length(df_names)) {
+    current_pairs <- all_results[[df_names[i]]]$found
     
     # Compare each 'LineItemENG' in the reference with the current data frame
     for (line_item in names(reference_pairs)) {
@@ -377,7 +611,7 @@ check_consistency_across_dataframes <- function(all_results) {
         # Check if the 'LineItemGEO' values are the same
         if (!identical(reference_pairs[[line_item]], current_pairs[[line_item]])) {
           # Record the inconsistency
-          inconsistent_pairs[[paste("DataFrame", i, "LineItem:", line_item)]] <- list(
+          inconsistent_pairs[[paste("DataFrame", df_names[i], "LineItem:", line_item)]] <- list(
             reference = reference_pairs[[line_item]],
             current = current_pairs[[line_item]]
           )
@@ -398,14 +632,73 @@ check_consistency_across_dataframes <- function(all_results) {
 # After processing all results, check for consistency
 check_consistency_across_dataframes(all_results)
 
+
+
+
 # Create a lookup table from the first data frame's results
 lookup_table <- data.frame(
   English = names(all_results$`DataFrame 1`$found),      # English 'LineItemENG' names
   Georgian = unlist(all_results$`DataFrame 1`$found)     # Corresponding Georgian 'LineItemGEO' values
 )
 
+lookup_table <- data.frame(
+  English = names(all_results[[1]]$found),
+  Georgian = unlist(all_results[[1]]$found)
+)
+
 # Reset row names to default
 rownames(lookup_table) <- NULL
+
+#Check that Georgian values do not have more than one english pair
+check_georgian_lead_consistency <- function(data_list_adjusted, lookup_table) {
+  # Initialize a list to store inconsistencies
+  inconsistencies <- list()
+  
+  # Iterate through each Georgian variable in the lookup table
+  for (geo_variable in unique(lookup_table$Georgian)) {
+    # Track English variables corresponding to the Georgian variable across data frames
+    english_mapping <- list()
+    
+    # Iterate through each data frame in the list
+    for (df_name in names(data_list_adjusted)) {
+      # Extract the data frame
+      df <- data_list_adjusted[[df_name]]
+      
+      # Check if the Georgian variable (LineItemGEO) exists in the data frame
+      if (geo_variable %in% df$LineItemGEO) {
+        # Find corresponding English variables (LineItemENG)
+        eng_values <- unique(df$LineItemENG[df$LineItemGEO == geo_variable])
+        english_mapping[[df_name]] <- eng_values
+      }
+    }
+    
+    # Flatten and check uniqueness of English variables
+    all_eng_values <- unlist(english_mapping)
+    unique_eng_values <- unique(all_eng_values)
+    
+    # If the Georgian variable maps to more than one unique English variable, record it
+    if (length(unique_eng_values) > 1) {
+      inconsistencies[[geo_variable]] <- list(
+        DataFrames = names(english_mapping),
+        EnglishVariables = english_mapping
+      )
+    }
+  }
+  
+  # Print inconsistencies if found
+  if (length(inconsistencies) > 0) {
+    cat("\nInconsistent Georgian variables found:\n")
+    for (geo_var in names(inconsistencies)) {
+      cat("\nGeorgian Variable:", geo_var, "\n")
+      print(inconsistencies[[geo_var]])
+    }
+  } else {
+    cat("\nAll Georgian variables have consistent English mappings across data frames.\n")
+  }
+}
+
+check_georgian_lead_consistency(data_list_adjusted, lookup_table)
+
 
 # Function to make data frames uniform by adding 'LineItemENG' based on 'LineItemGEO' and lookup table
 make_identical <- function(df, lookup_table) {
@@ -456,8 +749,34 @@ combined_data_list <- lapply(combined_data_list, function(df) {
   return(df)
 })
 
+# Function to make column types consistent across data frames
+standardize_column_types <- function(data_list) {
+  # Standardize 'ReportId' as character (or any column causing issues)
+  data_list <- lapply(data_list, function(df) {
+    if ("ReportId" %in% colnames(df)) {
+      df <- df %>%
+        mutate(ReportId = as.character(ReportId))  # Convert 'ReportId' to character
+    }
+    return(df)
+  })
+  return(data_list)
+}
+
+# Apply the function to standardize column types
+combined_data_list <- standardize_column_types(combined_data_list)
+
+'inconsistent_dfs <- lapply(combined_data_list, function(df) {
+  if ("IdCode" %in% colnames(df) && class(df$IdCode) != "character") {
+    return(names(df))
+  }
+})
+print(inconsistent_dfs)'
+
+
+
 # Combine the list of data frames into one data frame
 combined_df <- bind_rows(combined_data_list)
+
 
 # Function to group and split data frames by 'ReportCode' and then by 'LineItemENG'
 nested_list_of_dfs_group_split <- function(df) {
@@ -490,7 +809,7 @@ process_df_secondary <- function(df) {
     if (!(current_value %in% processed_year)) {
       processed_year <- append(processed_year, current_value)
       found_matches <- which(df$FVYear == current_value)
-      cat("Found matches for FVYear =", current_value, ":", found_matches, "\n")
+      cat("Found matches for FVYear =", current_value, ":", paste(found_matches, collapse = ", "), "\n")
       
       if (length(found_matches) > 1) {
         cat("Multiple rows for FVYear", current_value, "\n")
@@ -506,7 +825,7 @@ process_df_secondary <- function(df) {
         # Convert column data to numeric, handling any non-numeric values
         column_data_numeric <- suppressWarnings(as.numeric(as.character(column_data)))
         if (any(is.na(column_data_numeric))) {
-          cat("Warning: Non-numeric values found in ReportYear. Treating as NA:\n", column_data, "\n")
+          cat("Warning: Non-numeric values found in ReportYear. Treating as NA:\n", paste(column_data, collapse = ", "), "\n")
           column_data_numeric <- ifelse(is.na(column_data_numeric), -Inf, column_data_numeric) # Handle NAs by assigning a very low value
         }
         
@@ -515,8 +834,8 @@ process_df_secondary <- function(df) {
         column_data_numeric <- column_data_numeric[sorted_indices]
         value_data <- value_data[sorted_indices]
         
-        cat("Column data after sorting:", column_data_numeric, "\n")
-        cat("Value data after sorting:", value_data, "\n")
+        cat("Column data after sorting:", paste(column_data_numeric, collapse = ", "), "\n")
+        cat("Value data after sorting:", paste(value_data, collapse = ", "), "\n")
         
         # Find the first non-zero value in the sorted order
         non_zero_index <- which(value_data != 0)
@@ -531,12 +850,12 @@ process_df_secondary <- function(df) {
         }
         
         # Remove rows that are not the 'max_value_index'
-        found_matches <- found_matches[found_matches != max_value_index]
+        rows_to_remove <- found_matches[found_matches != max_value_index]
         
-        if (length(found_matches) > 0) {
+        if (length(rows_to_remove) > 0) {
           # Debugging: Print the indices to be removed
-          cat("Dropping rows with indices:", found_matches, "\n")
-          df <- df[-found_matches, ]
+          cat("Dropping rows with indices:", paste(rows_to_remove, collapse = ", "), "\n")
+          df <- df[-rows_to_remove, ]
         }
       }
     }
@@ -697,7 +1016,7 @@ calculate_statistics_by_year <- function(df, columns) {
           Percentile_75 = quantile(.data[[column_name]], 0.75, na.rm = TRUE),
           Percentile_90 = quantile(.data[[column_name]], 0.9, na.rm = TRUE),
           Percentile_95 = quantile(.data[[column_name]], 0.95, na.rm = TRUE),
-          Percentile_99 = quantile(.data[[column_name]], 0.99, na.rm = TRUE),
+          Percentile_99 = quantile(.data[[column_name]], 0.99, na.rm = TRUE)
         ) %>%
         mutate(Column = column_name)  # Add a column to identify the column name
       
@@ -794,7 +1113,7 @@ summary_non_beneficiaries <- bind_rows(
   summary_for_unprocessed_non_beneficiaries
 )
 
-#Unique beneficiaries
+# Unique beneficiaries
 unique_idcodes_non_beneficiaries <- final_wide_df_with_program %>%
   filter(is.na(ProgramBeneficiary)) %>%  # Filter rows where ProgramBeneficiary is NA
   select(IdCode) %>%                     # Select the IdCode column
@@ -805,19 +1124,24 @@ unique_idcodes_beneficiaries <- final_wide_df_with_program %>%
   select(IdCode) %>%                     # Select the IdCode column
   distinct() 
 
-cat("Number of beneficiaries :", length(unique_id_codes_beneficiaries))
-cat("Number of non beneficiaries :", length(unique_idcodes_non_beneficiaries))
+cat("Number of beneficiaries :", length(unique_idcodes_beneficiaries$IdCode), "\n")
+cat("Number of non beneficiaries :", length(unique_idcodes_non_beneficiaries$IdCode), "\n")
 
 # Write the summary statistics and final data to Excel and CSV files
-write_xlsx(unique_idcodes_beneficiaries, "final/unique_beneficiaries.xslx")
-write_xlsx(unique_idcodes_non_beneficiaries, "final/unique_non_beneficiaries.xslx")
+# Ensure the 'final' directory exists
+if (!dir.exists("final")) {
+  dir.create("final")
+}
+
+write_xlsx(unique_idcodes_beneficiaries, "final/unique_beneficiaries.xlsx")
+write_xlsx(unique_idcodes_non_beneficiaries, "final/unique_non_beneficiaries.xlsx")
 
 
 write_xlsx(summary_beneficiaries, "final/summary_beneficiaries.xlsx")
-write.csv(summary_beneficiaries, "final/summary_beneficiaries.csv")
+write.csv(summary_beneficiaries, "final/summary_beneficiaries.csv", row.names = FALSE)
 
 write_xlsx(summary_non_beneficiaries, "final/summary_non_beneficiaries.xlsx")
-write.csv(summary_non_beneficiaries, "final/summary_non_beneficiaries.csv")
+write.csv(summary_non_beneficiaries, "final/summary_non_beneficiaries.csv", row.names = FALSE)
 
 write_xlsx(final_wide_df_with_program, "final/final_data.xlsx")
-write.csv(final_wide_df_with_program, "final/final_data.csv")
+write.csv(final_wide_df_with_program, "final/final_data.csv", row.names = FALSE)
